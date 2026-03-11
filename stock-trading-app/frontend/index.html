@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>株式リアルタイム売買シグナル</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <h1 class="logo">📈 TradingSignals</h1>
+            <span class="version">スキャルピング対応</span>
+        </div>
+        <div class="header-center">
+            <div class="search-wrap">
+                <input type="text" id="symbolInput" placeholder="銘柄コード検索 (例: 7203.T, AAPL)" autocomplete="off">
+                <div id="searchResults" class="search-results hidden"></div>
+            </div>
+            <button id="loadBtn" class="btn-primary">チャート表示</button>
+        </div>
+        <div class="header-right">
+            <div class="price-display" id="headerPrice">
+                <span id="headerSymbol">-</span>
+                <span id="headerPriceVal" class="price-val">-</span>
+                <span id="headerChangePct" class="change-pct">-</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <!-- Left Panel: Controls -->
+        <aside class="left-panel">
+            <div class="panel-section">
+                <h3>📊 チャート設定</h3>
+                <div class="control-group">
+                    <label>時間足</label>
+                    <div class="btn-group" id="intervalGroup">
+                        <button class="btn-interval active" data-interval="1m">1分</button>
+                        <button class="btn-interval" data-interval="2m">2分</button>
+                        <button class="btn-interval" data-interval="5m">5分</button>
+                        <button class="btn-interval" data-interval="15m">15分</button>
+                        <button class="btn-interval" data-interval="30m">30分</button>
+                        <button class="btn-interval" data-interval="1h">1時間</button>
+                        <button class="btn-interval" data-interval="1d">日足</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>期間</label>
+                    <select id="periodSelect">
+                        <option value="1d">1日</option>
+                        <option value="5d">5日</option>
+                        <option value="1mo">1ヶ月</option>
+                        <option value="3mo">3ヶ月</option>
+                        <option value="6mo">6ヶ月</option>
+                        <option value="1y">1年</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3>📉 テクニカル指標</h3>
+                <div class="indicator-list">
+                    <label class="indicator-check">
+                        <input type="checkbox" data-indicator="sma20" checked> SMA 20
+                    </label>
+                    <label class="indicator-check">
+                        <input type="checkbox" data-indicator="sma50" checked> SMA 50
+                    </label>
+                    <label class="indicator-check">
+                        <input type="checkbox" data-indicator="ema9" checked> EMA 9
+                    </label>
+                    <label class="indicator-check">
+                        <input type="checkbox" data-indicator="rsi" checked> RSI 14
+                    </label>
+                    <label class="indicator-check">
+                        <input type="checkbox" data-indicator="macd" checked> MACD
+                    </label>
+                    <label class="indicator-check">
+                        <input type="checkbox" data-indicator="bb" checked> ボリンジャーバンド
+                    </label>
+                    <label class="indicator-check">
+                        <input type="checkbox" data-indicator="stoch"> ストキャスティクス
+                    </label>
+                    <label class="indicator-check">
+                        <input type="checkbox" data-indicator="vwap"> VWAP
+                    </label>
+                    <label class="indicator-check">
+                        <input type="checkbox" data-indicator="atr"> ATR
+                    </label>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3>🤖 自動売買設定</h3>
+                <div class="auto-trade-panel">
+                    <div class="toggle-wrap">
+                        <label class="toggle-label">自動売買</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="autoTradeToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div id="autoTradeConfig" class="auto-config hidden">
+                        <div class="config-row">
+                            <label>ストラテジー</label>
+                            <select id="strategySelect">
+                                <option value="signal_based">シグナルベース</option>
+                                <option value="rsi_bb">RSI + BB</option>
+                                <option value="macd_ema">MACD + EMA</option>
+                            </select>
+                        </div>
+                        <div class="config-row">
+                            <label>買いシグナル強度</label>
+                            <input type="range" id="buyThreshold" min="50" max="95" value="70">
+                            <span id="buyThresholdVal">70%</span>
+                        </div>
+                        <div class="config-row">
+                            <label>売りシグナル強度</label>
+                            <input type="range" id="sellThreshold" min="50" max="95" value="70">
+                            <span id="sellThresholdVal">70%</span>
+                        </div>
+                        <div class="config-row">
+                            <label>損切り</label>
+                            <input type="number" id="stopLoss" value="2.0" step="0.1" min="0.5" max="10">
+                            <span>%</span>
+                        </div>
+                        <div class="config-row">
+                            <label>利確</label>
+                            <input type="number" id="takeProfit" value="3.0" step="0.1" min="0.5" max="20">
+                            <span>%</span>
+                        </div>
+                        <div class="config-row">
+                            <label>最大ポジション</label>
+                            <input type="number" id="maxPosition" value="100" step="10" min="1">
+                            <span>株</span>
+                        </div>
+                        <button id="applyAutoTrade" class="btn-primary full-width">設定を適用</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Overall Signal Banner -->
+            <div id="signalBanner" class="signal-banner hidden">
+                <div class="signal-main" id="overallSignal">
+                    <span class="signal-action" id="signalAction">-</span>
+                    <span class="signal-strength" id="signalStrength"></span>
+                </div>
+                <div class="signal-desc" id="signalDesc">-</div>
+                <div class="signal-meter">
+                    <div class="meter-bar">
+                        <div id="meterFill" class="meter-fill"></div>
+                    </div>
+                    <div class="meter-labels">
+                        <span>売り</span>
+                        <span>中立</span>
+                        <span>買い</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Container -->
+            <div id="chartsContainer">
+                <div id="loadingOverlay" class="loading-overlay">
+                    <div class="loading-spinner"></div>
+                    <p>銘柄を選択してチャートを表示</p>
+                </div>
+                <div id="mainChart" class="chart-panel">
+                    <div class="chart-header">
+                        <span class="chart-title">ローソク足チャート</span>
+                        <div id="ohlcDisplay" class="ohlc-display"></div>
+                    </div>
+                    <div id="candlestickChart"></div>
+                </div>
+                <div id="rsiChart" class="chart-panel sub-chart hidden">
+                    <div class="chart-header">
+                        <span class="chart-title">RSI (14)</span>
+                        <span id="rsiValue" class="indicator-value"></span>
+                    </div>
+                    <div id="rsiChartContainer"></div>
+                </div>
+                <div id="macdChartDiv" class="chart-panel sub-chart hidden">
+                    <div class="chart-header">
+                        <span class="chart-title">MACD (12,26,9)</span>
+                        <span id="macdValue" class="indicator-value"></span>
+                    </div>
+                    <div id="macdChartContainer"></div>
+                </div>
+            </div>
+
+            <!-- Signal Cards -->
+            <div id="signalCards" class="signal-cards hidden">
+                <div class="signal-card" id="card-rsi">
+                    <div class="card-header">RSI</div>
+                    <div class="card-body">
+                        <div class="card-action" id="rsi-action">-</div>
+                        <div class="card-desc" id="rsi-desc">-</div>
+                    </div>
+                </div>
+                <div class="signal-card" id="card-macd">
+                    <div class="card-header">MACD</div>
+                    <div class="card-body">
+                        <div class="card-action" id="macd-action">-</div>
+                        <div class="card-desc" id="macd-desc">-</div>
+                    </div>
+                </div>
+                <div class="signal-card" id="card-bb">
+                    <div class="card-header">ボリンジャーバンド</div>
+                    <div class="card-body">
+                        <div class="card-action" id="bb-action">-</div>
+                        <div class="card-desc" id="bb-desc">-</div>
+                    </div>
+                </div>
+                <div class="signal-card" id="card-ma">
+                    <div class="card-header">移動平均線</div>
+                    <div class="card-body">
+                        <div class="card-action" id="ma-action">-</div>
+                        <div class="card-desc" id="ma-desc">-</div>
+                    </div>
+                </div>
+                <div class="signal-card" id="card-ema">
+                    <div class="card-header">EMA</div>
+                    <div class="card-body">
+                        <div class="card-action" id="ema-action">-</div>
+                        <div class="card-desc" id="ema-desc">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trade Log -->
+            <div id="tradeLog" class="trade-log hidden">
+                <h3>📋 取引ログ (シミュレーション)</h3>
+                <table class="trade-table">
+                    <thead>
+                        <tr>
+                            <th>時刻</th>
+                            <th>アクション</th>
+                            <th>価格</th>
+                            <th>数量</th>
+                            <th>損益</th>
+                            <th>理由</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tradeTableBody"></tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
